@@ -10,14 +10,8 @@
   Content
 </Button>
 
-// Input
-<Input label="Label" error="Error message" value={value} onChange={handler} />
-
-// LoadingSpinner
-<LoadingSpinner size="sm|md|lg" text="Loading message" />
-
 // ErrorMessage  
-<ErrorMessage message="Error text" onDismiss={handler} />
+<ErrorMessage message="Error text" onClose={handler} />
 ```
 
 ### Report Components
@@ -31,181 +25,232 @@
   loading={boolean} 
 />
 
-// DataTable
+// DataTable (self-managing sorting)
 <DataTable 
   data={[{...}, {...}]} 
   columns={['col1', 'col2']} 
-  sortConfig={{key, direction}} 
-  onSort={handler} 
 />
 
 // ExportButton
-<ExportButton data={array} filename="report_name" disabled={boolean} />
+<ExportButton data={array} filename="report_name" />
 ```
 
-### Layout Components
+## 🎣 React Hooks Quick Reference
 
-```jsx
-// PageLayout
-<PageLayout title="Page Title" backHref="/path" backLabel="Back Text">
-  {children}
-</PageLayout>
-```
-
-## 🎣 Hook Quick Reference
-
-### useReportData()
+### Main Dashboard State Management
 ```javascript
-const {
-  reports,           // Array of available reports
-  selectedReport,    // String: current report ID
-  setSelectedReport, // Function: (id) => void
-  reportData,        // Array: fetched data
-  loading,           // Boolean: loading state
-  error,             // String: error message
-  fetchReport,       // Function: (id) => Promise
-  clearError,        // Function: () => void
-} = useReportData();
+// Modern functional component with hooks
+export default function ReportDashboard() {
+  const [selectedReport, setSelectedReport] = useState('');
+  const [reportData, setReportData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  const handleReportChange = (event) => {
+    setSelectedReport(event.target.value);
+    setError(null);
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedReport) {
+      setError('Please select a report first');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    setReportData(null);
+
+    try {
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: selectedReport })
+      });
+      
+      if (!response.ok) throw new Error('Failed to fetch report data');
+      const data = await response.json();
+      setReportData(data);
+    } catch (error) {
+      setError(error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+}
 ```
 
-### useTableControls(data)
+## 🔧 API Quick Reference
+
+### POST /api/reports
 ```javascript
-const {
-  sortConfig,     // Object: {key, direction}
-  processedData,  // Array: sorted data
-  handleSort,     // Function: (columnKey) => void
-  resetControls,  // Function: () => void
-} = useTableControls(rawData);
-```
+// Request
+const response = await fetch('/api/reports', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ type: 'sales' }) // sales|inventory|customers|products|orders
+});
 
-## 🔧 Service Quick Reference
-
-### reportService
-```javascript
-// Fetch report data
-const data = await reportService.fetchReport(reportId);
-
-// Get available reports
-const reports = reportService.getAvailableReports();
-
-// Get report metadata
-const report = reportService.getReportById(reportId);
-```
-
-### apiClient
-```javascript
-// HTTP methods
-const data = await apiClient.get('/endpoint');
-const result = await apiClient.post('/endpoint', payload);
-
-// Authentication
-apiClient.setAuthToken(token);
+// Response
+const data = await response.json(); // Array of report objects
 ```
 
 ## 📋 Common Patterns
 
-### Basic Report Page
+### Complete Main Dashboard Example
 ```jsx
-function ReportPage() {
-  const {
-    reports,
-    selectedReport,
-    setSelectedReport,
-    reportData,
-    loading,
-    error,
-    fetchReport,
-    clearError,
-  } = useReportData();
+import { useState } from 'react';
+import ReportSelector from '../components/reports/ReportSelector';
+import DataTable from '../components/reports/DataTable';
+import ExportButton from '../components/reports/ExportButton';
+import ErrorMessage from '../components/ui/ErrorMessage';
+import { REPORTS, UI_MESSAGES } from '../constants';
 
-  const {
-    sortConfig,
-    processedData,
-    handleSort,
-    resetControls,
-  } = useTableControls(reportData);
+export default function ReportDashboard() {
+  const [selectedReport, setSelectedReport] = useState('');
+  const [reportData, setReportData] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
-  const handleReportChange = async (e) => {
-    setSelectedReport(e.target.value);
-    resetControls();
-    await fetchReport(e.target.value);
+  const handleReportChange = (event) => {
+    setSelectedReport(event.target.value);
+    setError(null);
   };
 
-  return (
-    <PageLayout title="Reports">
-      <ReportSelector 
-        reports={reports}
-        selectedReport={selectedReport}
-        onReportChange={handleReportChange}
-        loading={loading}
-      />
-      
-      {loading && <LoadingSpinner text="Loading report..." />}
-      {error && <ErrorMessage message={error} onDismiss={clearError} />}
-      
-      {reportData && (
-        <div className="bg-white rounded-lg border">
-          <div className="p-6 border-b">
-            <div className="flex justify-between items-center">
-              <h2>Report Title</h2>
-              <ExportButton data={processedData} filename="report" />
-            </div>
-          </div>
-          
-          <DataTable
-            data={processedData}
-            columns={Object.keys(reportData[0] || {})}
-            sortConfig={sortConfig}
-            onSort={handleSort}
-          />
-        </div>
-      )}
-    </PageLayout>
-  );
-}
-```
+  const handleSubmit = async () => {
+    if (!selectedReport) {
+      setError('Please select a report first');
+      return;
+    }
 
-### Form with Validation
-```jsx
-function FormComponent() {
-  const [name, setName] = useState('');
-  const [email, setEmail] = useState('');
-  const [errors, setErrors] = useState({});
-  const [loading, setLoading] = useState(false);
-
-  const handleSubmit = async (e) => {
-    e.preventDefault();
     setLoading(true);
+    setError(null);
+    setReportData(null);
+
     try {
-      await apiClient.post('/users', { name, email });
+      const response = await fetch('/api/reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: selectedReport })
+      });
+      
+      if (!response.ok) throw new Error(UI_MESSAGES.FETCH_ERROR);
+      const data = await response.json();
+      setReportData(data);
     } catch (error) {
-      setErrors({ general: error.message });
+      setError(error.message);
     } finally {
       setLoading(false);
     }
   };
 
+  const columns = reportData?.length ? Object.keys(reportData[0]) : [];
+  const reportName = REPORTS.find(r => r.id === selectedReport)?.name;
+
   return (
-    <form onSubmit={handleSubmit}>
-      <Input
-        label="Name"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        error={errors.name}
+    <div className="container mx-auto px-4 py-8">
+      <div className="flex justify-between items-center mb-6">
+        <h1 className="text-2xl font-bold text-gray-900">Reports Dashboard</h1>
+        {reportData?.length > 0 && (
+          <ExportButton
+            data={reportData}
+            filename={`${selectedReport}_report`}
+          />
+        )}
+      </div>
+
+      <div className="bg-white rounded-lg shadow-sm border p-6 mb-6">
+        <div className="flex gap-4 items-end">
+          <div className="flex-1">
+            <ReportSelector
+              reports={REPORTS}
+              selectedReport={selectedReport}
+              onReportChange={handleReportChange}
+              loading={loading}
+            />
+          </div>
+          <button
+            onClick={handleSubmit}
+            disabled={!selectedReport || loading}
+            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            {loading ? 'Loading...' : 'Load Report'}
+          </button>
+        </div>
+      </div>
+
+      <ErrorMessage 
+        message={error}
+        onClose={() => setError(null)}
       />
-      
-      <Input
-        label="Email"
-        type="email"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        error={errors.email}
-      />
-      
-      {errors.general && <ErrorMessage message={errors.general} />}
+
+      {reportData?.length > 0 && (
+        <div className="bg-white rounded-lg shadow-sm border">
+          <div className="p-6">
+            <h2 className="text-xl font-semibold mb-4">{reportName}</h2>
+            <DataTable data={reportData} columns={columns} />
+          </div>
+        </div>
+      )}
+
+      {reportData?.length === 0 && (
+        <div className="bg-white rounded-lg shadow-sm border p-8 text-center text-gray-500">
+          {UI_MESSAGES.NO_DATA}
+        </div>
+      )}
+    </div>
+  );
+}
+```
+
+## 🏗️ Architecture Notes
+
+### Modern React Patterns Used
+- ✅ **Functional Components**: All components use modern function syntax
+- ✅ **React Hooks**: `useState` for state management throughout
+- ✅ **Direct Fetch**: No over-engineered API clients, just direct fetch calls
+- ✅ **Component Separation**: Reusable UI components where it makes sense
+- ✅ **Self-Contained Logic**: DataTable manages its own sorting state
+
+### Constants Structure
+```javascript
+// src/constants/index.js
+export const REPORTS = [
+  { id: 'sales', name: 'Sales Report' },
+  { id: 'inventory', name: 'Inventory Status' },
+  { id: 'customers', name: 'Customer Analysis' },
+  { id: 'products', name: 'Product Performance' },
+  { id: 'orders', name: 'Order Summary' }
+];
+
+export const TABLE_CONFIG = {
+  SORT_DIRECTIONS: {
+    ASC: 'asc',
+    DESC: 'desc'
+  }
+};
+
+export const UI_MESSAGES = {
+  LOADING: 'Loading report data...',
+  FETCH_ERROR: 'Failed to fetch report data',
+  NO_DATA: 'No data available'
+};
+```
+
+### Simple API Pattern
+```javascript
+// Clean, direct approach - no abstractions needed for single endpoint
+const response = await fetch('/api/reports', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ type: selectedReport })
+});
+
+if (!response.ok) throw new Error('Failed to fetch report data');
+const data = await response.json();
       
       <Button type="submit" disabled={loading}>
-        {loading ? <LoadingSpinner size="sm" text="" /> : 'Submit'}
+        {loading ? 'Saving...' : 'Save'}
       </Button>
     </form>
   );

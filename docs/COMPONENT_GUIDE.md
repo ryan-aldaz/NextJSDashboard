@@ -1,11 +1,9 @@
-# Component & Hook Documentation
+# Component Documentation
 
 ## Table of Contents
 - [UI Components](#ui-components)
 - [Report Components](#report-components) 
-- [Layout Components](#layout-components)
-- [Custom Hooks](#custom-hooks)
-- [Services](#services)
+- [Main Dashboard](#main-dashboard)
 - [Best Practices](#best-practices)
 
 ---
@@ -57,96 +55,7 @@
 
 **When NOT to use**:
 - ❌ For navigation links (use Next.js Link instead)
-- ❌ For form submission (unless you handle it manually)
-
----
-
-### Input (`src/components/ui/Input.js`)
-
-**Purpose**: Form input component with label, error handling, and accessibility.
-
-**Props**:
-- `label` (string): Label text for the input
-- `error` (string): Error message to display
-- `id` (string): Input ID (auto-generated if not provided)
-- `className` (string): Additional CSS classes
-- `...props`: All standard input props (type, placeholder, value, onChange, etc.)
-
-**Usage Examples**:
-```jsx
-// Basic input with label
-<Input
-  label="Report Name"
-  placeholder="Enter report name"
-  value={reportName}
-  onChange={(e) => setReportName(e.target.value)}
-/>
-
-// Input with error state
-<Input
-  label="Email"
-  type="email"
-  value={email}
-  onChange={(e) => setEmail(e.target.value)}
-  error={emailError}
-/>
-
-// Input without label
-<Input
-  placeholder="Search..."
-  value={searchTerm}
-  onChange={(e) => setSearchTerm(e.target.value)}
-/>
-```
-
-**Accessibility Features**:
-- Automatic ID generation
-- Proper label association
-- Error message connection via aria-describedby
-- Focus management
-
-**When to use**:
-- ✅ All form inputs in the application
-- ✅ When you need consistent styling and error handling
-- ✅ When accessibility is important
-
----
-
-### LoadingSpinner (`src/components/ui/LoadingSpinner.js`)
-
-**Purpose**: Consistent loading indicator with customizable size and text.
-
-**Props**:
-- `size` (string): Spinner size
-  - `'sm'` - Small (16px)
-  - `'md'` - Medium (20px, default)
-  - `'lg'` - Large (32px)
-- `text` (string): Loading text to display (default: "Loading...")
-- `className` (string): Additional CSS classes
-
-**Usage Examples**:
-```jsx
-// Basic loading spinner
-<LoadingSpinner />
-
-// With custom text
-<LoadingSpinner text="Generating report..." />
-
-// Large spinner for full page loading
-<LoadingSpinner size="lg" text="Loading dashboard..." />
-
-// Small spinner for inline loading
-<LoadingSpinner size="sm" text="" />
-```
-
-**When to use**:
-- ✅ API calls in progress
-- ✅ File uploads/downloads
-- ✅ Any async operation
-
-**When NOT to use**:
-- ❌ For very quick operations (< 500ms)
-- ❌ When you have skeleton loaders
+- ❌ For simple inline buttons (use HTML button element)
 
 ---
 
@@ -156,26 +65,22 @@
 
 **Props**:
 - `message` (string): Error message to display
-- `onDismiss` (function): Optional dismiss handler
+- `onClose` (function): Dismiss handler function
 - `className` (string): Additional CSS classes
 
 **Usage Examples**:
 ```jsx
-// Basic error message
-<ErrorMessage message="Failed to load report data" />
-
-// With dismiss functionality
+// Basic error message with close handler
 <ErrorMessage 
   message={error} 
-  onDismiss={() => setError(null)}
+  onClose={() => setError(null)}
 />
 
 // Conditional rendering
 {error && (
   <ErrorMessage 
     message={error} 
-    onDismiss={clearError}
-    className="mb-4"
+    onClose={() => setError(null)}
   />
 )}
 ```
@@ -196,9 +101,208 @@
 
 ### ReportSelector (`src/components/reports/ReportSelector.js`)
 
-**Purpose**: Dropdown selector for choosing report types.
+**Purpose**: Simple dropdown selector for choosing report types.
 
 **Props**:
+- `reports` (array): Array of report objects with `id` and `name`
+- `selectedReport` (string): Currently selected report ID
+- `onReportChange` (function): Change handler function
+- `loading` (boolean): Disable dropdown when loading
+
+**Usage Example**:
+```jsx
+<ReportSelector
+  reports={REPORTS}
+  selectedReport={selectedReport}
+  onReportChange={handleReportChange}
+  loading={loading}
+/>
+```
+
+**When to use**:
+- ✅ Report selection in dashboards
+- ✅ When you need a labeled dropdown
+- ✅ Consistent styling across the app
+
+---
+
+### DataTable (`src/components/reports/DataTable.js`)
+
+**Purpose**: Self-contained sortable data table with internal state management.
+
+**Props**:
+- `data` (array): Array of data objects to display
+- `columns` (array): Array of column keys to show
+
+**Key Features**:
+- **Self-Managing Sorting**: Handles sort state internally
+- **Click to Sort**: Click column headers to sort
+- **Sort Indicators**: Shows ↑/↓ arrows for current sort
+- **No External State**: Manages sorting completely internally
+
+**Usage Example**:
+```jsx
+const columns = reportData?.length ? Object.keys(reportData[0]) : [];
+
+<DataTable 
+  data={reportData} 
+  columns={columns} 
+/>
+```
+
+**Internal Behavior**:
+- Maintains `sortKey` and `sortDirection` in component state
+- Handles sort direction toggling
+- Displays sorted data automatically
+
+**When to use**:
+- ✅ Displaying tabular report data
+- ✅ When you want sorting without external state management
+- ✅ Clean, minimal table display
+
+---
+
+### ExportButton (`src/components/reports/ExportButton.js`)
+
+**Purpose**: CSV export functionality with proper data escaping and timestamps.
+
+**Props**:
+- `data` (array): Data to export
+- `filename` (string): Base filename (timestamp added automatically)
+- `variant` (string): Button variant (optional)
+
+**Features**:
+- **Automatic CSV Escaping**: Handles commas, quotes, newlines
+- **Timestamp Filenames**: Adds date to filename automatically
+- **Uses Button Component**: Consistent styling
+- **Download Icon**: Visual export indicator
+
+**Usage Example**:
+```jsx
+<ExportButton
+  data={reportData}
+  filename={`${selectedReport}_report`}
+/>
+```
+
+**Generated Filename**: `sales_report_2024-01-15.csv`
+
+**When to use**:
+- ✅ Exporting report data
+- ✅ When you need CSV download functionality
+- ✅ Consistent export experience
+
+---
+
+## Main Dashboard
+
+### Main Page (`src/app/page.js`)
+
+**Architecture**: Functional component with React hooks
+
+**State Management**:
+```javascript
+const [selectedReport, setSelectedReport] = useState('');
+const [reportData, setReportData] = useState(null);
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
+```
+
+**Key Features**:
+- **Submit-Based Loading**: User clicks "Load Report" button
+- **Loading States**: Button shows loading text
+- **Error Handling**: Displays errors with dismiss functionality
+- **Export Integration**: Shows export button when data available
+
+**Data Flow**:
+1. User selects report from dropdown
+2. User clicks "Load Report" button
+3. POST request to `/api/reports` with report type
+4. Data displayed in sortable table
+5. Export button becomes available
+
+---
+
+## Best Practices
+
+### Component Architecture
+
+**✅ DO:**
+- Use functional components with hooks
+- Keep components focused on single responsibility
+- Use `useState` for component-specific state
+- Use props for component communication
+- Keep styling consistent with Tailwind classes
+
+**❌ DON'T:**
+- Use class components (outdated pattern)
+- Over-engineer with unnecessary abstractions
+- Create complex prop drilling chains
+- Mix business logic with presentation
+
+### State Management
+
+**✅ DO:**
+```javascript
+// Clean, modern hook usage
+const [selectedReport, setSelectedReport] = useState('');
+const [loading, setLoading] = useState(false);
+const [error, setError] = useState(null);
+```
+
+**❌ DON'T:**
+```javascript
+// Avoid class component patterns
+this.setState({ selectedReport: value });
+```
+
+### API Calls
+
+**✅ DO:**
+```javascript
+// Direct, clean fetch calls
+const response = await fetch('/api/reports', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ type: selectedReport })
+});
+```
+
+**❌ DON'T:**
+- Over-engineer with complex API client abstractions for simple use cases
+- Create unnecessary service layers for single endpoints
+
+### Component Design
+
+**✅ DO:**
+- Keep components reusable but not over-abstracted
+- Use semantic HTML elements
+- Include proper accessibility attributes
+- Handle loading and error states
+
+**❌ DON'T:**
+- Create components for every small piece of UI
+- Ignore accessibility requirements
+- Skip error handling
+
+### File Organization
+
+**✅ Current Structure:**
+```
+src/
+├── app/page.js              # Main dashboard
+├── components/
+│   ├── reports/             # Report-specific components
+│   └── ui/                  # Reusable UI components
+├── constants/               # App constants
+└── api/reports/            # API endpoints
+```
+
+**Why this works:**
+- Clear separation of concerns
+- Easy to find components
+- Scalable structure
+- Follows Next.js conventions
 - `reports` (array): Array of report objects `[{id, name}, ...]`
 - `selectedReport` (string): Currently selected report ID
 - `onReportChange` (function): Handler for report selection change
@@ -331,49 +435,6 @@
 - Proper comma/quote escaping
 - UTF-8 encoding
 - RFC 4180 compliant
-
----
-
-## Layout Components
-
-### PageLayout (`src/components/layout/PageLayout.js`)
-
-**Purpose**: Consistent page structure with header and navigation.
-
-**Props**:
-- `title` (string): Page title
-- `children` (ReactNode): Page content
-- `backHref` (string): Back button URL (default: '/')
-- `backLabel` (string): Back button text (default: 'Back to Home')
-- `className` (string): Additional CSS classes
-
-**Usage Examples**:
-```jsx
-<PageLayout title="Reports Dashboard">
-  <ReportSelector />
-  <DataTable />
-</PageLayout>
-
-// With custom navigation
-<PageLayout 
-  title="User Management"
-  backHref="/admin"
-  backLabel="Back to Admin"
->
-  <UserTable />
-</PageLayout>
-```
-
-**Features**:
-- Consistent header styling
-- Responsive design
-- Automatic navigation
-- Proper semantic HTML structure
-
-**When to use**:
-- ✅ All main application pages
-- ✅ When you need consistent layout
-- ✅ When you need navigation
 
 ---
 
